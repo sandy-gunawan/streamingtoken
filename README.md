@@ -8,6 +8,8 @@ variable is *how the answer is delivered*.
 > New to this? Read [What is streaming?](#what-is-streaming-explained-simply) first.
 >
 > Beginner setup guide: [NEWBIE_GUIDE.md](NEWBIE_GUIDE.md)
+>
+> Live demo (Container App): https://stream-demo.victorioushill-04e9a1c7.southeastasia.azurecontainerapps.io
 
 ---
 

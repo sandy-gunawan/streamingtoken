@@ -16,8 +16,8 @@ variable is *how the answer is delivered*.
 ## What you get
 
 - **One "Ask" button** fires a single request.
-- The app does **retrieval once** (shared grounding), then generates the answer **twice at the
-  same time**: `stream = false` and `stream = true`.
+- The app does **retrieval once** (shared grounding), then does **one streamed generation** and
+  mirrors the final completed text into the non-streaming panel.
 - Side‑by‑side panels: the streaming panel fills in **token by token**; the non‑streaming panel
   spins, then dumps the whole answer at once.
 - Live metrics: **Time To First Token (TTFT)**, total time, tokens/sec.
@@ -44,8 +44,8 @@ Your question
       ▼
 Azure AI Search  ── query the indexes ONCE (full-text) ──►  shared grounding
       │
-      ├──►  GPT‑4.1  stream = false   ──►  full answer, all at once   (Non‑streaming panel)
-      └──►  GPT‑4.1  stream = true    ──►  tokens as generated        (Streaming panel)
+  └──►  GPT‑4.1  stream = true    ──►  tokens as generated (Streaming panel)
+               └──►  final full text mirrored (Non‑streaming panel)
 ```
 
 - **Retrieval**: queries the underlying search indexes directly with full-text (BM25) search.
@@ -61,8 +61,35 @@ Azure AI Search  ── query the indexes ONCE (full-text) ──►  shared gro
 | --- | --- |
 | `lib/search.ts` | Queries the search indexes directly (full-text). |
 | `lib/openai.ts` | Azure OpenAI client + shared prompt/params. |
-| `app/api/ask/route.ts` | Retrieve once → generate twice concurrently → SSE. |
+| `app/api/ask/route.ts` | Retrieve once → stream tokens via SSE → mirror final text for non-stream view. |
 | `components/DemoClient.tsx` | Parses SSE, drives the two panels and metrics. |
+
+## Where Stream And Non-Stream Live In Code
+
+Use this section to jump straight to the implementation.
+
+### Backend
+
+- **Streaming call enabled**: `stream: true` in `chat.completions.create(...)`.
+  - See `app/api/ask/route.ts` around the OpenAI call.
+- **Streaming tokens sent live**: each token chunk is emitted as `event: token`.
+  - See `app/api/ask/route.ts` in the `for await (const chunk of s)` loop.
+- **Non-stream panel behavior**: final full text is emitted once as `event: nonstream_complete`.
+  - See `app/api/ask/route.ts` where `send("nonstream_complete", { text: full, ... })` is called.
+
+### Frontend
+
+- **Stream panel update**: appends incoming `token` events into `streamText`.
+  - See `components/DemoClient.tsx` in `handleEvent` for `case "token"`.
+- **Non-stream panel update**: sets `nonStreamText` only when `nonstream_complete` arrives.
+  - See `components/DemoClient.tsx` in `handleEvent` for `case "nonstream_complete"`.
+- **Panel rendering**:
+  - Streaming panel: `AnswerPanel` with `variant="stream"`.
+  - Non-streaming panel: `AnswerPanel` with `variant="nonstream"`.
+  - See `components/DemoClient.tsx` in the `panels` block.
+
+> Note: current implementation uses one real streamed generation and mirrors the completed answer
+> into the non-stream panel to compare delivery style with identical content.
 
 ---
 
